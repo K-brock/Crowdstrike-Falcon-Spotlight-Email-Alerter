@@ -1,0 +1,29 @@
+Comments:
+
+### Possible future features
+- Product <> Remiation override ability through CSV Mapper - Prior to the scheduled email being sent, prefil most common product > remediations with even more detailed steps/guidance OPTIONALLY for more control OR to add a note from the sec team
+- 'How to Update' hyperlink button under certain products. Once again specified through a CSV Mapper to a desired web guide
+- Per user analytics & noncompliant user flags
+- Foundry App integration
+
+
+### API Usage
+This tool makes multiple API calls per device
+Total API requests Per Device:
+- ~4-6 calls to fetch vulnerability IDs (varies by priority levels and pagination)
+- ~3-10 calls to fetch vulnerability details (depends on vulnerability count)
+- Additional shared calls for device discovery
+CrowdStrike Spotlight API has a 100 requests per minute Limit
+
+
+### Estimated Runtime
+Per-device minimum processing time: ~5-10 seconds
+Per-device average processing time: ~15-30 seconds
+Per-device maximum processing time: ~60+ seconds for heavily vulnerable systems
+AVERAGE Per device: 15-30 seconds 
+100 devices: ~25-50 minutes
+500 devices: ~2-4 hours
+
+
+Notes:
+- Devices are processed sequentially, not in parallel
