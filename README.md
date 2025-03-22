@@ -23,11 +23,12 @@
 ## **Prerequisites** ✅
 
 - Python 3.6+  
-- CrowdStrike Falcon API credentials with access to Spotlight Vulnerabilities API  
-- Microsoft Outlook (for email functionality)
+- CrowdStrike Falcon API credentials
+- API Scopes [spotlight-vulnerabilities:read] [hosts:read]
+- Microsoft Outlook installed locally
 - Windows OS
 
-Emails are dispatched locally through the COM API - as such there is no need for a Graph API / Entra custom App integration. Emails will be sent from the locally logged in user account, as such the reccomendation is to deploy to a VM and create a new mailbox 'vulnerabilityNotifier@domain'.
+Emails are dispatched locally through the COM API - as such there is no need for a Graph API / Entra custom App integration. Emails will be sent from the locally logged in user account, as such the reccomendation is to deploy to a VM and create a new mailbox 'vulnerabilityNotifier@domain'. 
 
 ---
 
