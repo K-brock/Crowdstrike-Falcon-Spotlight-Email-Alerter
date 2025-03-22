@@ -1,5 +1,5 @@
 If there is interest
-- Product <> Remiation override ability through CSV Mapper - Prior to the scheduled email being sent, prefil most common product > remediations with even more detailed steps/guidance OPTIONALLY for more control
+- Product <> Remiation override ability through CSV Mapper - Prior to the scheduled email being sent, prefil most common product > remediations with even more detailed steps/guidance OPTIONALLY for more control OR to add a note from the sec team
 - 'How to Update' hyperlink button under certain products. Once again specified through a CSV Mapper to a desired web guide
 - Per user analytics & noncompliant user flags
 - Foundry App integration
