@@ -44,7 +44,7 @@ Emails are dispatched locally through the COM API - as such there is no need for
 
 **Clone this repository:**
 ```bash
-git clone https://github.com/yourusername/crowdstrike-vulnerability-notifier.git
+git clone https://github.com/K-brock/Crowdstrike-Falcon-Spotlight-Email-Alerter
 ```
 
 **Install required packages:**
