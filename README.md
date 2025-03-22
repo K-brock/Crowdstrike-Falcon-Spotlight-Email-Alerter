@@ -1,7 +1,7 @@
 # **CrowdStrike Falcon Spotlight Email Sender** 🛡️
 > ⚠️ This tool is personally developed and is not supported, maintained, or endorsed by CrowdStrike. 
 
-*Using Falcon Spotlight with a manual patching process? How much time are you spending reaching out to users informing them which software they need to update?*
+*Using Falcon Spotlight with a manual patching process? No MDM either!? How much time are you spending reaching out to users informing them which software they need to update?*
 
 *Streamline your workflow through automation! Leveraging the CrowdStrike Falcon Spotlight API, automatically identify the most critical vulnerabilities on each user's device, delivering personalized email notifications with tailored guidance on updating their applications.*
 
