@@ -1,4 +1,5 @@
 # **CrowdStrike Vulnerability Notifier** 🛡️
+> ⚠️ This tool and is personally developed and not supported, maintained, or endorsed by CrowdStrike. 
 
 *Using Falcon Spotlight with a manual patching process? How much time are you spending reaching out to users informing them which software they need to update?*
 
