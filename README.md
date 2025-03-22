@@ -1,9 +1,11 @@
-# **CrowdStrike Vulnerability Notifier** 🛡️
+# **CrowdStrike Falcon Spotlight Email Sender** 🛡️
 > ⚠️ This tool is personally developed and is not supported, maintained, or endorsed by CrowdStrike. 
 
 *Using Falcon Spotlight with a manual patching process? How much time are you spending reaching out to users informing them which software they need to update?*
 
 *Streamline your workflow through automation! Leveraging the CrowdStrike Falcon Spotlight API, automatically identify the most critical vulnerabilities on each user's device, delivering personalized email notifications with tailored guidance on updating their applications.*
+
+![Screenshot 2025-03-22 233111](https://github.com/user-attachments/assets/18cbca6d-22c4-46fd-aded-e30e9d92d2b7)
 
 ---
 
@@ -25,7 +27,7 @@
 - Microsoft Outlook (for email functionality)
 - Windows OS
 
-Emails are dispatched locally through the COM API - as such there is no need for a Graph API or complex Entra custom App integration. Emails will be sent from the locally logged in user account, as such the reccomendation is to deploy to a VM and create a new mailbox 'vulnerabilityNotifier@domain'.
+Emails are dispatched locally through the COM API - as such there is no need for a Graph API / Entra custom App integration. Emails will be sent from the locally logged in user account, as such the reccomendation is to deploy to a VM and create a new mailbox 'vulnerabilityNotifier@domain'.
 
 ---
 
@@ -65,16 +67,17 @@ FALCON_CLOUD='us-2'  # Change to your appropriate region (us-1, us-2, eu-1, etc.
 
 Run the script once to generate the device mapping CSV:
 ```bash
-python Spotlight_Notifier.py
+python Spotlight_Sender.py
 ```
 
 Open `device_mappings.csv` and add email addresses for each device owner.
+Devices with empty addresses will be ignored (explicit inclusion)
 
 ### **Regular Operation**
 
 Once email addresses are populated, simply run the script:
 ```bash
-python Spotlight_Notifier.py
+python Spotlight_Sender.py
 ```
 
 The script will:
@@ -87,7 +90,7 @@ The script will:
 
 ## **Scheduling** ⏰
 
-For automated operation, consider setting up a scheduled task (Windows) or cron job (Linux) to run the script at regular intervals.
+For automated operation, consider setting up a scheduled task (Windows) to run the script at regular intervals.
 
 ---
 
@@ -103,6 +106,7 @@ base_filter_components = {
     "OpenV": "status:!'closed'",
     "Remediation_Possible": "cve.remediation_level:'O'",
     "Actively_Exploited": "cve.exploitability_status:'true'"
+    # Actively exploited.. "XploitS": "cve.exploit_status:['60','90']",
 }
 ```
 
@@ -112,7 +116,7 @@ Modify the `generate_email_content` method to change the email format, content, 
 
 ### **Logging**
 
-The script logs all activity to `RuntimeLogs.log` in the script directory. Check this file for troubleshooting or to monitor script execution.
+The script logs all activity to `RuntimeLogs.log` in the script directory. Check this file for troubleshooting or to monitor script execution. It is very high fidelity and should answer all your questions. Logs are written over each execution.
 
 ---
 
