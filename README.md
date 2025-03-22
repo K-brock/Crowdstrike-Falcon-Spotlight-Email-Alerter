@@ -1,5 +1,5 @@
 # **CrowdStrike Vulnerability Notifier** 🛡️
-> ⚠️ This tool and is personally developed and not supported, maintained, or endorsed by CrowdStrike. 
+> ⚠️ This tool is personally developed and is not supported, maintained, or endorsed by CrowdStrike. 
 
 *Using Falcon Spotlight with a manual patching process? How much time are you spending reaching out to users informing them which software they need to update?*
 
@@ -88,18 +88,6 @@ The script will:
 ## **Scheduling** ⏰
 
 For automated operation, consider setting up a scheduled task (Windows) or cron job (Linux) to run the script at regular intervals.
-
----
-
-## **How It Works** 🔍
-
-- **Device Discovery**: Uses the CrowdStrike Hosts API to retrieve all devices  
-- **CSV Management**: Maintains a CSV file mapping device IDs to hostnames and email addresses  
-- **Vulnerability Scanning**: Queries the Spotlight Vulnerabilities API for each device  
-- **Prioritization**: Processes vulnerabilities in order of severity (CRITICAL → HIGH → MEDIUM)  
-- **Deduplication**: Groups vulnerabilities by application to avoid redundant notifications  
-- **Email Generation**: Creates professional HTML emails with clear remediation instructions  
-- **Notification**: Sends emails via the Outlook COM API  
 
 ---
 
