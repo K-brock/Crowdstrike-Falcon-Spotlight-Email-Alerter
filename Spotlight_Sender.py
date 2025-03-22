@@ -18,7 +18,6 @@ formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
-
 class VulnerabilityNotifier:
     def __init__(self):
         load_dotenv()
@@ -39,7 +38,7 @@ class VulnerabilityNotifier:
         logger.debug("VulnerabilityNotifier initialized.")
 
     def create_csv_if_not_exists(self):
-        """Initialize CSV file if it doesn't exist"""
+        #Initialize CSV file if it doesn't exist
         if not self.csv_path.exists():
             with open(self.csv_path, 'w', newline='', encoding='utf-8') as file:
                 writer = csv.DictWriter(file, fieldnames=['AID', 'hostname', 'email address'])
@@ -47,7 +46,7 @@ class VulnerabilityNotifier:
             logger.info(f"Created new CSV file: {self.csv_path}")
 
     def get_devices(self):
-        """Fetch devices from CrowdStrike API"""
+        # Fetch all host AIDs
         falcon_hosts = Hosts(
             client_id=self.api_key,
             client_secret=self.api_secret,
@@ -91,7 +90,7 @@ class VulnerabilityNotifier:
         return devices
 
     def update_device_mappings(self):
-        """Update device mappings in CSV"""
+        # Update device mapping CSV, whilst preserving entries
         devices = self.get_devices()
         if not devices:
             logger.warning("No devices found or error occurred during device fetch")
@@ -123,7 +122,6 @@ class VulnerabilityNotifier:
             logger.error(f"Error updating device mappings: {str(e)}")
 
     def read_existing_mappings(self):
-        """Read existing mappings from CSV"""
         existing_data = {}
         try:
             with open(self.csv_path, 'r', encoding='utf-8') as file:
@@ -141,7 +139,6 @@ class VulnerabilityNotifier:
         return existing_data
 
     def write_mappings_to_csv(self, data):
-        """Write mappings to CSV file"""
         try:
             with open(self.csv_path, 'w', newline='', encoding='utf-8') as file:
                 writer = csv.DictWriter(file, fieldnames=['AID', 'hostname', 'email address'])
@@ -163,37 +160,175 @@ class VulnerabilityNotifier:
             logger.error(f"Error writing mappings to CSV: {str(e)}")
 
     def get_vulnerabilities_for_aid(self, aid):
-        """Get vulnerabilities for a specific AID"""
-        filter_components = {
+        """
+        Get vulnerabilities for a specific AID using scroll pagination.
+        Retrieves vulnerabilities in order of priority: CRITICAL, then HIGH, then MEDIUM,
+        until at least 5 unique applications are found or all priority levels are checked.
+        """
+        # Base filter components that will be used in all queries
+        # Edit where applicable i.e. you may wish to include a filter for actively exploited only
+        base_filter_components = {
             "AID": f"aid:'{aid}'",
-            "ExPRT": "cve.exprt_rating:['HIGH','CRITICAL']",
-            "XploitS": "cve.exploit_status:['60','90']",
             "OpenV": "status:!'closed'",
             "Remediation_Possible": "cve.remediation_level:'O'"
         }
         
-        filter_string = "+".join(filter_components.values())
+        # Priority levels in order of importance
+        priority_levels = ["CRITICAL", "HIGH", "MEDIUM"]
         
-        try:
-            response = self.falcon_vuln.query_vulnerabilities(filter=filter_string)
-            if response["status_code"] != 200:
-                logger.error(f"Error querying vulnerabilities for AID {aid}: {response['status_code']}")
-                return None
+        combined_vuln_ids = []
+        unique_products = set()
+        
+        # Process each priority level one by one until we have at least 5 applications or run out of levels
+        for priority in priority_levels:
+            # If we already have 5 or more unique products, we can stop
+            if len(unique_products) >= 5:
+                logger.debug(f"Already found {len(unique_products)} unique products before checking {priority} vulnerabilities")
+                break
                 
-            logger.debug(f"Vulnerabilities queried for AID {aid}: {response['body'].get('resources')}")
-            return response["body"]["resources"]
+            logger.debug(f"Retrieving {priority} vulnerabilities for AID {aid}")
+            
+            # Create a new filter string for the current priority level
+            current_filter_components = base_filter_components.copy()
+            current_filter_components["ExPRT"] = f"cve.exprt_rating:'{priority}'"
+            filter_string = "+".join(current_filter_components.values())
+            
+            # Retrieve vulnerabilities for the current priority level
+            vuln_ids = self._retrieve_vulnerabilities_with_pagination(aid, filter_string)
+            
+            if vuln_ids:
+                combined_vuln_ids.extend(vuln_ids)
+                
+                # Process these vulnerabilities to see if we now have enough unique products
+                temp_products = self._get_unique_products_from_vulns(vuln_ids)
+                unique_products.update(temp_products)
+                
+                logger.debug(f"After processing {priority} vulnerabilities: {len(unique_products)} unique products found")
+        
+        logger.debug(f"Total unique vulnerabilities fetched for AID {aid} across all priority levels: {len(combined_vuln_ids)}")
+        return combined_vuln_ids
+
+    def _retrieve_vulnerabilities_with_pagination(self, aid, filter_string):
+        # Helper method to retrieve vulnerabilities using pagination.
+        all_vuln_ids = []
+        limit = 100  # vulnerabilities per page
+        scroll_after = None
+        total_vulns = None
+        iteration_count = 0
+        max_iterations = 7  # 700 CVE ID soft limit - Safeguard against infinite loops
+
+        try:
+            # Initial request with scrolling enabled
+            response = self.falcon_vuln.query_vulnerabilities(
+                filter=filter_string,
+                limit=limit,
+                scroll=True
+            )
+
+            if response["status_code"] != 200:
+                logger.error(f"Error querying vulnerabilities for AID {aid}: {response['status_code']} - Response: {response}")
+                return []
+
+            resources = response["body"].get("resources", [])
+            all_vuln_ids.extend(resources)
+            pagination = response["body"].get("meta", {}).get("pagination", {})
+            total_vulns = pagination.get("total")
+            scroll_after = pagination.get("after")
+            logger.debug(f"Fetched {len(resources)} vulnerabilities for AID {aid} in the first batch. Total reported: {total_vulns}")
+
+            # Track unique IDs seen so far to avoid duplicates
+            seen_ids = set(resources)
+
+            # Continue pagination only if we have more results to fetch and a valid scroll token
+            while scroll_after and (len(all_vuln_ids) < total_vulns) and (iteration_count < max_iterations):
+                iteration_count += 1
+                
+                # Use the scroll parameter correctly
+                response = self.falcon_vuln.query_vulnerabilities(
+                    filter=filter_string,
+                    limit=limit,
+                    scroll=True,
+                    after=scroll_after
+                )
+
+                if response["status_code"] != 200:
+                    logger.error(f"Error during scrolling for AID {aid}: {response['status_code']}")
+                    break
+
+                resources = response["body"].get("resources", [])
+                if not resources:
+                    logger.debug("No resources returned in this scroll batch; ending pagination.")
+                    break
+
+                # Only add new IDs to avoid duplicates
+                new_ids = [id for id in resources if id not in seen_ids]
+                seen_ids.update(new_ids)
+                all_vuln_ids.extend(new_ids)
+                
+                logger.debug(f"Fetched {len(resources)} vulnerabilities in batch {iteration_count + 1}, added {len(new_ids)} new IDs. Total unique: {len(seen_ids)}")
+                
+                pagination = response["body"].get("meta", {}).get("pagination", {})
+                new_scroll_after = pagination.get("after")
+
+                # If the 'after' value is unchanged or empty, exit the loop
+                if not new_scroll_after or new_scroll_after == scroll_after:
+                    logger.debug("'After' value did not change; ending pagination.")
+                    break
+
+                scroll_after = new_scroll_after
+
+            return list(seen_ids)
+
         except Exception as e:
-            logger.error(f"Error querying vulnerabilities for AID {aid}: {str(e)}")
-            return None
+            logger.exception(f"Error querying vulnerabilities for AID {aid}: {str(e)}")
+            return []
+
+    def _get_unique_products_from_vulns(self, vuln_ids):
+        """
+        Helper method to get unique product names from a list of vulnerability IDs.
+        Returns a set of product names.
+        """
+        unique_products = set()
+        
+        if not vuln_ids:
+            return unique_products
+            
+        batch_size = 10
+        for i in range(0, len(vuln_ids), batch_size):
+            batch = vuln_ids[i:i+batch_size]
+            
+            try:
+                vuln_details = self.falcon_vuln.get_vulnerabilities(ids=batch)
+                
+                if vuln_details["status_code"] == 200:
+                    for vuln in vuln_details["body"]["resources"]:
+                        product_name = vuln.get('apps', [{}])[0].get('product_name_version', 'N/A')
+                        
+                        if product_name != 'N/A':
+                            unique_products.add(product_name)
+                
+                time.sleep(1)  # Rate limiting
+                
+            except Exception as e:
+                logger.error(f"Error processing vulnerability batch: {str(e)}")
+                continue
+        
+        return unique_products
 
     def process_vulnerabilities(self, vuln_ids):
         """Process vulnerability details and return deduplicated results"""
+        if not vuln_ids:
+            logger.debug("No vulnerability IDs to process")
+            return {}
+            
+        logger.debug(f"Processing {len(vuln_ids)} unique vulnerability IDs")
         dedup_vulns = defaultdict(lambda: {'cves': set(), 'severity': '', 'expert_rating': '', 'action': ''})
         severity_order = {'CRITICAL': 3, 'HIGH': 2, 'MEDIUM': 1, 'LOW': 0}
         
         batch_size = 10
         for i in range(0, len(vuln_ids), batch_size):
             batch = vuln_ids[i:i+batch_size]
+            logger.debug(f"Processing batch {i//batch_size + 1} of {(len(vuln_ids) + batch_size - 1)//batch_size}")
             
             try:
                 vuln_details = self.falcon_vuln.get_vulnerabilities(ids=batch)
@@ -229,7 +364,7 @@ class VulnerabilityNotifier:
                 logger.error(f"Error processing vulnerability batch: {str(e)}")
                 continue
                 
-        logger.debug("Vulnerability processing complete.")
+        logger.debug(f"Vulnerability processing complete. Found {len(dedup_vulns)} unique products with vulnerabilities.")
         return dedup_vulns
 
     def generate_email_content(self, dedup_vulns):
@@ -257,7 +392,7 @@ class VulnerabilityNotifier:
         <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Software Update Alert</title>
+            <title>Software Update Required</title>
         </head>
         <body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f5f5f5; color: #333333;">
             <!-- Main Table -->
@@ -277,8 +412,7 @@ class VulnerabilityNotifier:
                             <tr>
                                 <td style="padding: 20px;">
                                     <!-- Introduction -->
-                                    <p style="text-align: center;">Vulnerable software has been identified as running on your device.</p>
-                                    <p style="text-align: center;">Please assist the security team by updating the following applications at your earliest convenience:</p>
+                                    <p style="text-align: center;">We've identified vulnerable software installed on your device. Help us protect our organization by updating the following applications as soon as possible:</p>
         """
         
         # Add vulnerability cards
@@ -313,7 +447,7 @@ class VulnerabilityNotifier:
                             <!-- Footer -->
                             <tr>
                                 <td style="background-color: #222222; padding: 15px; text-align: center; color: #ffffff; font-size: 14px; border-radius: 0 0 5px 5px;">
-                                    <p style="margin: 0;">&copy; The Security Team</p>
+                                    <p style="margin: 0;">Thank you for helping keep us secure.</p>
                                 </td>
                             </tr>
                         </table>
