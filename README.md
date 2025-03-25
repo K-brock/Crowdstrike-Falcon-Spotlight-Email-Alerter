@@ -1,5 +1,5 @@
 # **CrowdStrike Falcon Spotlight Email Sender** 🛡️
-> ⚠️ This tool is personally developed and is not supported, maintained, or endorsed by CrowdStrike. 
+> ⚠️ This tool is personally developed and is not supported, maintained, or endorsed by CrowdStrike. Use at your own risk, or do not use.
 
 *Using Falcon Spotlight with a manual patching process? No MDM either!? How much time are you spending reaching out to users informing them which software they need to update?*
 
